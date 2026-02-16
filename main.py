@@ -1,5 +1,6 @@
 from fastapi import Depends,FastAPI
 from models import Products
+from fastapi import HTTPException
 from database import session,engine
 import database_models
 
@@ -30,7 +31,7 @@ def get_db():
 
 def init_db():
     db=session()
-    count= db.query(database_models.Products).count
+    count= db.query(database_models.Products).count()
     if count == 0:
         for products in product:
             db.add(database_models.Products(**products.model_dump()))
@@ -39,7 +40,6 @@ init_db()
 
 @app.get("/products")
 def get_all_products(db:session = Depends(get_db)):
-   
     db_products = db.query(database_models.Products).all()
     return db_products
 
@@ -47,9 +47,9 @@ def get_all_products(db:session = Depends(get_db)):
 def get_product_id(id:int,db:session = Depends(get_db)):
     db_product=db.query(database_models.Products).filter(database_models.Products.id==id).first()
     
-    if db_product:
-        return db_product
-    return "product not found"
+    if not db_product:
+        raise HTTPException(status_code=404,detail = "product not found")
+    return db_product
 
 @app.post("/products")
 def add_the_products(new_product: Products, db = Depends(get_db)):
@@ -64,20 +64,25 @@ def add_the_products(new_product: Products, db = Depends(get_db)):
 
     
 
-@app.put("/products")
-def update_the_product(id:int, update_product:Products):
-    for i in range(len(product)):
-        if product[i].id==id:
-            product[i]=update_product
-            return "products added sucessfully"
-    return "no product found"
-
-@app.delete("/product")
-def delete_product(id:int,db:session=Depends(get_db)):
+@app.put("/products/{id}")
+def update_the_product(id:int, update_product:Products,db:session=Depends(get_db)):
     db_product=db.query(database_models.Products).filter(database_models.Products.id==id).first()
     if db_product:
-        db.delete(db_product)
+        db_product.name=update_product.name
+        db_product.price=update_product.price
+        db_product.description=update_product.description
+        db_product.quantity=update_product.quantity
         db.commit()
-        return "product deleted"
-    else:
-        return "Not found"
+        return "product_updated"
+    raise HTTPException(status_code=404, detail="Product not found")
+    
+
+@app.delete("/products/{id}")
+def delete_product(id:int,db:session=Depends(get_db)):
+    db_product=db.query(database_models.Products).filter(database_models.Products.id==id).first()
+    if not db_product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    db.delete(db_product)
+    db.commit()
+    return {"message": "Product deleted successfully"}
