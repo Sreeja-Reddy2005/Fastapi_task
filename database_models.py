@@ -1,5 +1,5 @@
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column,Integer,String,Float
+from sqlalchemy import Column,Integer,String,Float,Boolean
 Base=declarative_base()
 
 
@@ -19,3 +19,4 @@ class User(Base):
     email=Column(String(255),unique=True,index=True)
     hashed_password=Column(String(255))
     role=Column(String(50),default="user")
+    is_active = Column(Boolean, default=True)

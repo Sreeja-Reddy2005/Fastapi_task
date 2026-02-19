@@ -5,11 +5,11 @@ from fastapi import HTTPException
 from database import session,engine
 import database_models
 from jose import jwt
+from jose import JWTError
+from fastapi import status
 from datetime import datetime, timedelta
 from fastapi.security import OAuth2PasswordBearer
-
-
-
+from fastapi.security import OAuth2PasswordRequestForm
 
 app = FastAPI()
 
@@ -123,12 +123,15 @@ def register(user:Usercreate,db=Depends(get_db)):
     return {"message":"user registerd"}
 
 @app.post("/login")
-def login(user:UserLogin,db=Depends(get_db)):
+def login(form_data: OAuth2PasswordRequestForm = Depends(),db=Depends(get_db)):
     db_user=db.query(database_models.User).filter(
-        database_models.User.user_name == user.username).first()
+        database_models.User.user_name == form_data.username).first()
     if not db_user:
         raise HTTPException(status_code=400,detail="user not found")
-    if not verify_password(user.password,db_user.hashed_password):
+    if not db_user.is_active:
+        raise HTTPException(status_code=401,detail="deactivated")
+
+    if not verify_password(form_data.password,db_user.hashed_password):
         raise HTTPException(status_code=400,detail="Invalid password")
     access_token=create_access_token({'sub':db_user.user_name})
     return {
@@ -154,7 +157,7 @@ def get_current_user(
     db = Depends(get_db)):
     credential_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
+        detail="could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},)
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
